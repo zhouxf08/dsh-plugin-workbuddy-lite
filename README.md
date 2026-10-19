@@ -51,6 +51,21 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.2.tgz
 装完完全退出 DSH 再打开（macOS 用 `⌘Q`，不是关窗口）。侧边栏 **设置 → CodeBuddy**
 出现认证页即安装成功。
 
+### 桌面端（DSH.app）
+
+桌面 profile 由 DSH.app 独占管理，不能直接用 `dsh plugin --profile desktop` 修改。
+请在应用里操作：
+
+1. 先在 **插件** 页卸载或禁用旧包 `dsh-plugin-workbuddy-codebuddy`；
+2. 点 **添加插件**，在「包名或地址」里填 tarball 的**绝对路径**，例如：
+   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.2.tgz`
+3. 安装完成后如果出现「立即启用」，点一次；没有的话重启 DSH.app；
+4. 打开 **账号菜单 → 设置 → CodeBuddy** 测试。
+
+> 旧包和新包都注册 `codebuddy` provider 路由，不能同时启用。新包沿用
+> `CODEBUDDY_WORKBUDDY_SESSIONS` / `CODEBUDDY_API_KEYS` 两个凭据引用，所以已保存的
+> 账号和 API Key 通常可以直接沿用。
+
 如果已经装了别的 CodeBuddy provider 插件（例如 `@tnnevol/dsh-codebuddy`、
 `@mybna134/dsh-llm-codebuddy`，或更名前的 `dsh-plugin-workbuddy-codebuddy`），
 请先移除或禁用，否则两个插件会争用同一个 `codebuddy` provider 路由。
