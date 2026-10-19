@@ -42,7 +42,7 @@ npm pack
 自带的 Electron 以 Node 模式执行同一个 CLI。也可以手动执行：
 
 ```sh
-dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.4.tgz
+dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.5.tgz
 ```
 
 > **不要直接 `dsh plugin add` 本目录**：本地目录会以 pnpm `link:` 方式安装，插件运行时
@@ -59,7 +59,7 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.4.tgz
 
 1. 先在 **插件** 页卸载或禁用旧包 `dsh-plugin-workbuddy-codebuddy`；
 2. 点 **添加插件**，在「包名或地址」里填 tarball 的**绝对路径**，例如：
-   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.4.tgz`
+   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.5.tgz`
 3. 安装完成后如果出现「立即启用」，点一次；没有的话重启 DSH.app；
 4. 打开 **账号菜单 → 设置 → CodeBuddy** 测试。
 
@@ -157,6 +157,15 @@ lib/web.js               设置页 HTTP 路由（仅回环同源）
 lib/client.js            设置页 React 组件（settings.section）
 test/                    纯函数测试
 ```
+
+## 修复记录
+
+- **0.1.5**：修复 DSH 0.2.1 的 `role: "tool"` 消息序列化。Tool 结果现在紧跟在
+  对应 assistant `tool_calls` 后发出，tool call id 超过 64 字符时使用稳定短别名，
+  纯工具调用回合的 assistant `content` 使用空字符串。解决 CodeBuddy
+  `code 11148 / tool calls and tool results do not match`。
+- **0.1.4**：配置入口移到输入框下方、与上下文进度条同一行。
+- **0.1.3**：端到端适配 DSH 0.2.1，补齐 compatibility.json，地址自动规范化。
 
 ## 已知限制
 

@@ -163,3 +163,188 @@ test('adapter sends tool calls and tool results in OpenAI format', async (t) => 
   assert.equal(chat.headers['x-ide-type'], 'WorkBuddy')
   assert.equal(chat.headers['user-agent'], 'WorkBuddy/5.77 CodeBuddy/5.77')
 })
+
+test('tool results immediately follow their assistant tool calls', async (t) => {
+  const { server, requests, origin } = await startServer()
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const credential = {
+    kind: 'api-key',
+    value: 'test-key',
+    entry: { environment: 'custom', endpoint: origin, account: {} },
+    origin,
+    baseURL: `${origin}/v2`,
+    account: {},
+  }
+  const adapter = new CodeBuddyAdapter({
+    options: () => ({ profile: { displayName: 'CodeBuddy' }, retryPolicy: undefined }),
+    models: () => [],
+    resolveCredential: async () => credential,
+    resolveAttachments: () => undefined,
+  })
+  for await (const _chunk of adapter.stream({
+    provider: 'codebuddy',
+    model: 'glm-4.7',
+    messages: [
+      { role: 'user', content: [{ type: 'text', text: 'start' }] },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'calling' },
+          { type: 'tool-call', id: 'c1', name: 'lookup', arguments: '{}' },
+          { type: 'tool-call', id: 'c2', name: 'lookup2', arguments: '{}' },
+        ],
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'after' },
+          { type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'r1' }] },
+          { type: 'tool-result', toolCallId: 'c2', content: [{ type: 'text', text: 'r2' }] },
+        ],
+      },
+      { role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+    ],
+  })) {
+    // consume
+  }
+  const chat = requests.find((request) => request.url === '/v2/chat/completions')
+  const body = JSON.parse(chat.body)
+  assert.deepEqual(body.messages.map((message) => message.role), ['user', 'assistant', 'tool', 'tool', 'user', 'assistant'])
+  assert.deepEqual(body.messages[1].tool_calls.map((call) => call.id), ['c1', 'c2'])
+  assert.equal(body.messages[2].tool_call_id, 'c1')
+  assert.equal(body.messages[2].content, 'r1')
+  assert.equal(body.messages[3].tool_call_id, 'c2')
+  assert.equal(body.messages[4].content, 'after')
+})
+
+test('unmatched tool calls and orphan tool results are dropped', async (t) => {
+  const { server, requests, origin } = await startServer()
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const credential = {
+    kind: 'api-key',
+    value: 'test-key',
+    entry: { environment: 'custom', endpoint: origin, account: {} },
+    origin,
+    baseURL: `${origin}/v2`,
+    account: {},
+  }
+  const adapter = new CodeBuddyAdapter({
+    options: () => ({ profile: { displayName: 'CodeBuddy' }, retryPolicy: undefined }),
+    models: () => [],
+    resolveCredential: async () => credential,
+    resolveAttachments: () => undefined,
+  })
+  for await (const _chunk of adapter.stream({
+    provider: 'codebuddy',
+    model: 'glm-4.7',
+    messages: [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'calling' },
+          { type: 'tool-call', id: 'c1', name: 'lookup', arguments: '{}' },
+          { type: 'tool-call', id: 'missing', name: 'lookup2', arguments: '{}' },
+          { type: 'text', text: 'tail' },
+        ],
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'r1' }] },
+          { type: 'tool-result', toolCallId: 'orphan', content: [{ type: 'text', text: 'nope' }] },
+        ],
+      },
+    ],
+  })) {
+    // consume
+  }
+  const chat = requests.find((request) => request.url === '/v2/chat/completions')
+  const body = JSON.parse(chat.body)
+  assert.deepEqual(body.messages.map((message) => message.role), ['assistant', 'tool'])
+  assert.deepEqual(body.messages[0].tool_calls.map((call) => call.id), ['c1'])
+  assert.equal(body.messages[1].tool_call_id, 'c1')
+})
+
+test('DSH 0.2.1 role:tool messages are serialized as tool messages', async (t) => {
+  const { server, requests, origin } = await startServer()
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const credential = {
+    kind: 'api-key',
+    value: 'test-key',
+    entry: { environment: 'custom', endpoint: origin, account: {} },
+    origin,
+    baseURL: `${origin}/v2`,
+    account: {},
+  }
+  const adapter = new CodeBuddyAdapter({
+    options: () => ({ profile: { displayName: 'CodeBuddy' }, retryPolicy: undefined }),
+    models: () => [],
+    resolveCredential: async () => credential,
+    resolveAttachments: () => undefined,
+  })
+  for await (const _chunk of adapter.stream({
+    provider: 'codebuddy',
+    model: 'glm-4.7',
+    messages: [
+      { role: 'user', content: [{ type: 'text', text: 'start' }] },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'tool-call', id: 'c1', name: 'lookup', arguments: '{}' },
+        ],
+      },
+      {
+        role: 'tool',
+        toolCallId: 'c1',
+        content: [{ type: 'text', text: 'tool result' }],
+      },
+    ],
+  })) {
+    // consume
+  }
+  const chat = requests.find((request) => request.url === '/v2/chat/completions')
+  const body = JSON.parse(chat.body)
+  assert.deepEqual(body.messages.map((message) => message.role), ['user', 'assistant', 'tool'])
+  assert.equal(body.messages[1].content, '')
+  assert.equal(body.messages[1].tool_calls[0].id, 'c1')
+  assert.equal(body.messages[2].tool_call_id, 'c1')
+  assert.equal(body.messages[2].content, 'tool result')
+})
+
+test('long tool call ids are bounded consistently', async (t) => {
+  const { server, requests, origin } = await startServer()
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const credential = {
+    kind: 'api-key',
+    value: 'test-key',
+    entry: { environment: 'custom', endpoint: origin, account: {} },
+    origin,
+    baseURL: `${origin}/v2`,
+    account: {},
+  }
+  const adapter = new CodeBuddyAdapter({
+    options: () => ({ profile: { displayName: 'CodeBuddy' }, retryPolicy: undefined }),
+    models: () => [],
+    resolveCredential: async () => credential,
+    resolveAttachments: () => undefined,
+  })
+  const longId = `call_${'x'.repeat(100)}`
+  for await (const _chunk of adapter.stream({
+    provider: 'codebuddy',
+    model: 'glm-4.7',
+    messages: [
+      {
+        role: 'assistant',
+        content: [{ type: 'tool-call', id: longId, name: 'lookup', arguments: '{}' }],
+      },
+      { role: 'tool', toolCallId: longId, content: [{ type: 'text', text: 'r' }] },
+    ],
+  })) {
+    // consume
+  }
+  const chat = requests.find((request) => request.url === '/v2/chat/completions')
+  const body = JSON.parse(chat.body)
+  const callId = body.messages[0].tool_calls[0].id
+  assert.equal(callId, body.messages[1].tool_call_id)
+  assert.ok(callId.length <= 64)
+})
