@@ -28,6 +28,20 @@ test('normalizeOrigin rejects non-http(s)', () => {
   assert.throws(() => normalizeOrigin('not a url'), /合法/)
 })
 
+test('normalizeOrigin strips pasted key pages and API paths', () => {
+  assert.equal(normalizeOrigin('https://copilot.tencent.com/profile/'), 'https://copilot.tencent.com')
+  assert.equal(normalizeOrigin('https://copilot.tencent.com/profile/keys'), 'https://copilot.tencent.com')
+  assert.equal(normalizeOrigin('https://copilot.tencent.com/v2/chat/completions'), 'https://copilot.tencent.com')
+  assert.equal(normalizeOrigin('https://copilot.tencent.com/v3/config'), 'https://copilot.tencent.com')
+  assert.equal(normalizeOrigin('https://gateway.example.com/codebuddy/v2'), 'https://gateway.example.com/codebuddy')
+  assert.equal(normalizeOrigin('copilot.tencent.com'), 'https://copilot.tencent.com')
+})
+
+test('normalizeOrigin rejects OpenAI /v1 URLs', () => {
+  assert.throws(() => normalizeOrigin('https://openrouter.ai/api/v1'), /OpenAI/)
+  assert.throws(() => normalizeOrigin('https://openrouter.ai/api/v1/chat/completions'), /OpenAI/)
+})
+
 test('api key identity uses CLI product headers', () => {
   const headers = apiKeyIdentityHeaders({ environment: 'internal', account: { uid: 'u1', enterpriseId: 'e1' } })
   assert.equal(headers['X-IDE-Type'], 'CLI')

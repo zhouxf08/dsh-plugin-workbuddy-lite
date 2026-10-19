@@ -9,7 +9,7 @@
 set -eu
 
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-TARBALL=${1:-"$DIR/dsh-plugin-workbuddy-lite-0.1.2.tgz"}
+TARBALL=${1:-"$DIR/dsh-plugin-workbuddy-lite-0.1.3.tgz"}
 PROFILE=${DSH_INSTALL_PROFILE:-web}
 
 if [ ! -f "$TARBALL" ]; then

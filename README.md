@@ -4,7 +4,7 @@
 
 ![设置 → CodeBuddy](docs/preview.png)
 
-把 WorkBuddy / CodeBuddy 的模型接进 DSH：在 **设置 → CodeBuddy** 里选一种认证方式——用浏览器登录 WorkBuddy，或粘贴 CodeBuddy CLI 平台签发的 API Key。插件会在 `ctx.llm` 上注册 `codebuddy` provider，模型目录、聊天流、工具调用、推理档位与图片输入都走 CodeBuddy 官方协议。
+把 WorkBuddy / CodeBuddy 的模型接进 DSH：打开窗口右下角的 **CodeBuddy** 底部入口（或 **设置 → CodeBuddy**），选一种认证方式——用浏览器登录 WorkBuddy，或粘贴 CodeBuddy CLI 平台签发的 API Key。插件会在 `ctx.llm` 上注册 `codebuddy` provider，模型目录、聊天流、工具调用、推理档位与图片输入都走 CodeBuddy 官方协议。
 
 本项目是一个**第三方适配器**，不属于 WorkBuddy、CodeBuddy 或 DeepSeek Harness 官方项目。
 
@@ -12,6 +12,7 @@ GitHub：<https://github.com/zhouxf08/dsh-plugin-workbuddy-lite>
 
 ## 功能
 
+- **底部独立入口**：窗口最底部右侧常驻 **CodeBuddy** 按钮，点开就是配置弹层，不需要翻设置
 - **两种认证方式，随时切换**
   - **WorkBuddy 浏览器**：点击登录 → 打开 WorkBuddy 授权页 → 授权完成后自动落库账号与模型目录；
   - **CodeBuddy CLI API Key**：粘贴平台 API Key，支持中国版 / 海外版 / iOA / 自定义服务地址。
@@ -41,7 +42,7 @@ npm pack
 自带的 Electron 以 Node 模式执行同一个 CLI。也可以手动执行：
 
 ```sh
-dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.2.tgz
+dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.3.tgz
 ```
 
 > **不要直接 `dsh plugin add` 本目录**：本地目录会以 pnpm `link:` 方式安装，插件运行时
@@ -58,7 +59,7 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.2.tgz
 
 1. 先在 **插件** 页卸载或禁用旧包 `dsh-plugin-workbuddy-codebuddy`；
 2. 点 **添加插件**，在「包名或地址」里填 tarball 的**绝对路径**，例如：
-   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.2.tgz`
+   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.3.tgz`
 3. 安装完成后如果出现「立即启用」，点一次；没有的话重启 DSH.app；
 4. 打开 **账号菜单 → 设置 → CodeBuddy** 测试。
 
@@ -75,9 +76,13 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.2.tgz
 
 ## 使用
 
+### 打开配置
+
+窗口最底部右侧的 **CodeBuddy** 按钮，或 **账号菜单 → 设置 → CodeBuddy**，二选一。
+
 ### 方式一：WorkBuddy 浏览器登录
 
-1. 打开 **设置 → CodeBuddy**；
+1. 打开 **CodeBuddy** 配置弹层；
 2. 选择 **WorkBuddy 浏览器**；
 3. 点 **登录 WorkBuddy**，浏览器会打开 WorkBuddy 授权页；
 4. 完成授权后回到 DSH，页面会自动显示账号与模型数量。
@@ -86,7 +91,7 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.2.tgz
 
 ### 方式二：CodeBuddy CLI API Key
 
-1. 打开 **设置 → CodeBuddy**；
+1. 打开 **CodeBuddy** 配置弹层；
 2. 选择 **CodeBuddy CLI API Key**；
 3. 选择服务环境：
    - 中国版：<https://copilot.tencent.com/profile/>
@@ -94,6 +99,10 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.2.tgz
    - iOA 企业版：在 iOA 平台获取 Key
    - 自定义：填写企业自建服务地址
 4. 粘贴 Key，可填备注名，点 **保存并使用**。
+5. 保存前会先测试模型目录；失败时错误信息会带上实际请求地址，点 **测试连接** 可随时复测。
+
+> 自定义服务地址只填**服务根**，例如 `https://copilot.tencent.com`。插件会自动去掉误填的
+> `/profile/keys`、`/v2/chat/completions` 等后缀；OpenAI 兼容的 `/v1` 地址会被拒绝。
 
 保存时插件会先用该 Key 拉一次模型目录；拉不到模型会拒绝保存并给出错误，不会把无效 Key 落库。
 

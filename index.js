@@ -22,9 +22,12 @@ import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { CodeBuddyAdapter } from './lib/adapter.js'
 import { fetchAccount, fetchModels } from './lib/catalog.js'
 import {
+  API_ENVIRONMENT_ORIGINS,
   API_KEY_ENV,
   API_ENVIRONMENTS,
   AUTH_MODES,
+  CHAT_PATH,
+  CONFIG_PATH,
   DISPLAY_NAME,
   NS,
   PROVIDER,
@@ -252,7 +255,10 @@ export function apply(ctx, config = {}) {
   const loadModels = async (credential, signal) => {
     const list = await fetchModels(credential, { signal })
     if (list.length === 0) {
-      throw new LlmError('CodeBuddy 没有返回该凭据可用的模型', 'DISCOVERY_FAILED')
+      throw new LlmError(
+        `CodeBuddy 没有返回该凭据可用的模型（接口 ${credential.origin}${CONFIG_PATH}）`,
+        'DISCOVERY_FAILED',
+      )
     }
     return list
   }
@@ -430,6 +436,13 @@ export function apply(ctx, config = {}) {
     const activeKey = keys.find((entry) => entry.kind === 'dsh' && entry.id === keyStore.activeId)
       ?? keys.find((entry) => entry.kind === 'dsh')
       ?? keys[0]
+    // 当前生效的服务根与两个端点：设置页直接展示，用户能立刻看出地址是否填错。
+    let endpointOrigin
+    if (profile.mode === 'workbuddy') endpointOrigin = WORKBUDDY_ORIGIN
+    else if (activeKey !== undefined) {
+      endpointOrigin = activeKey.endpoint
+        ?? (activeKey.environment === 'custom' ? undefined : API_ENVIRONMENT_ORIGINS[activeKey.environment])
+    }
     return {
       ok: true,
       mode: profile.mode,
@@ -441,6 +454,11 @@ export function apply(ctx, config = {}) {
         modelSource: modelSource ?? null,
         modelUpdatedAt: modelUpdatedAt || null,
         error: lastError ?? null,
+        ...(endpointOrigin === undefined ? {} : {
+          origin: endpointOrigin,
+          catalogUrl: `${endpointOrigin}${CONFIG_PATH}`,
+          chatUrl: `${endpointOrigin}/v2${CHAT_PATH}`,
+        }),
       },
       workbuddy: {
         authenticated: active !== undefined,
