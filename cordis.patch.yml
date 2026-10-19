@@ -1,0 +1,10 @@
+# dsh-plugin-workbuddy-lite 的组合补丁。
+#
+# 只插入一个 Loader 行；`name` 必须与本包 package.json 的 name 完全一致，
+# 否则 Loader 会以「failed to import」结束。
+#
+# 认证配置全部在 Web 设置页完成：WorkBuddy 浏览器登录，或粘贴 CodeBuddy CLI
+# 平台的 API Key。这里刻意不写任何凭据字段。
+- insert:
+    - id: workbuddy-lite
+      name: dsh-plugin-workbuddy-lite

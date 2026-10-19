@@ -1,0 +1,96 @@
+{
+  "name": "dsh-plugin-workbuddy-lite",
+  "version": "0.1.2",
+  "description": "WorkBuddy Lite —— WorkBuddy 浏览器登录 + CodeBuddy CLI API Key 双认证的 DeepSeek Harness 模型接入插件",
+  "type": "module",
+  "main": "index.js",
+  "icon": "./icon.svg",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "workbuddy",
+    "workbuddy-lite",
+    "codebuddy",
+    "provider",
+    "oauth",
+    "api-key"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./compatibility.json": "./compatibility.json"
+  },
+  "files": [
+    "index.js",
+    "lib/**/*.js",
+    "compatibility.json",
+    "cordis.patch.yml",
+    "icon.svg",
+    "docs/*.png",
+    "install.sh",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4",
+    "eventsource-parser": "^3.1.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.5",
+    "@deepseek-ai/dsh-attachment": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-locale": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-credentials": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-launch-environment": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-settings": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-timeout": "0.2.1-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-attachment": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    },
+    "engines": {
+      "dsh": ">=0.2.1-rc.2 <0.3.0"
+    }
+  },
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "for f in index.js lib/*.js; do node --check \"$f\" || exit 1; done && node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-credentials": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-launch-environment": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-timeout": "0.2.1-rc.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhouxf08/dsh-plugin-workbuddy-lite.git"
+  },
+  "homepage": "https://github.com/zhouxf08/dsh-plugin-workbuddy-lite#readme",
+  "bugs": {
+    "url": "https://github.com/zhouxf08/dsh-plugin-workbuddy-lite/issues"
+  }
+}
