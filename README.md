@@ -4,7 +4,7 @@
 
 ![设置 → CodeBuddy](docs/preview.png)
 
-把 WorkBuddy / CodeBuddy 的模型接进 DSH：打开窗口右下角的 **CodeBuddy** 底部入口（或 **设置 → CodeBuddy**），选一种认证方式——用浏览器登录 WorkBuddy，或粘贴 CodeBuddy CLI 平台签发的 API Key。插件会在 `ctx.llm` 上注册 `codebuddy` provider，模型目录、聊天流、工具调用、推理档位与图片输入都走 CodeBuddy 官方协议。
+把 WorkBuddy / CodeBuddy 的模型接进 DSH：打开输入框下方、与上下文进度条同一行的 **CodeBuddy** 入口（或 **设置 → CodeBuddy**），选一种认证方式——用浏览器登录 WorkBuddy，或粘贴 CodeBuddy CLI 平台签发的 API Key。插件会在 `ctx.llm` 上注册 `codebuddy` provider，模型目录、聊天流、工具调用、推理档位与图片输入都走 CodeBuddy 官方协议。
 
 本项目是一个**第三方适配器**，不属于 WorkBuddy、CodeBuddy 或 DeepSeek Harness 官方项目。
 
@@ -12,7 +12,7 @@ GitHub：<https://github.com/zhouxf08/dsh-plugin-workbuddy-lite>
 
 ## 功能
 
-- **底部独立入口**：窗口最底部右侧常驻 **CodeBuddy** 按钮，点开就是配置弹层，不需要翻设置
+- **输入框下方入口**：在输入框下方的统计/上下文进度条同一行常驻 **CodeBuddy** 按钮，点开就是配置弹层
 - **两种认证方式，随时切换**
   - **WorkBuddy 浏览器**：点击登录 → 打开 WorkBuddy 授权页 → 授权完成后自动落库账号与模型目录；
   - **CodeBuddy CLI API Key**：粘贴平台 API Key，支持中国版 / 海外版 / iOA / 自定义服务地址。
@@ -42,7 +42,7 @@ npm pack
 自带的 Electron 以 Node 模式执行同一个 CLI。也可以手动执行：
 
 ```sh
-dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.3.tgz
+dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.4.tgz
 ```
 
 > **不要直接 `dsh plugin add` 本目录**：本地目录会以 pnpm `link:` 方式安装，插件运行时
@@ -59,7 +59,7 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.3.tgz
 
 1. 先在 **插件** 页卸载或禁用旧包 `dsh-plugin-workbuddy-codebuddy`；
 2. 点 **添加插件**，在「包名或地址」里填 tarball 的**绝对路径**，例如：
-   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.3.tgz`
+   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.4.tgz`
 3. 安装完成后如果出现「立即启用」，点一次；没有的话重启 DSH.app；
 4. 打开 **账号菜单 → 设置 → CodeBuddy** 测试。
 
@@ -78,7 +78,7 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.3.tgz
 
 ### 打开配置
 
-窗口最底部右侧的 **CodeBuddy** 按钮，或 **账号菜单 → 设置 → CodeBuddy**，二选一。
+输入框下方、与上下文进度条同一行的 **CodeBuddy** 按钮，或 **账号菜单 → 设置 → CodeBuddy**，二选一。
 
 ### 方式一：WorkBuddy 浏览器登录
 
