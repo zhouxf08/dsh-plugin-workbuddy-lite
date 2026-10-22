@@ -17,7 +17,11 @@ GitHub：<https://github.com/zhouxf08/dsh-plugin-workbuddy-lite>
   - **WorkBuddy 浏览器**：点击登录 → 打开 WorkBuddy 授权页 → 授权完成后自动落库账号与模型目录；
   - **CodeBuddy CLI API Key**：粘贴平台 API Key，支持中国版 / 海外版 / iOA / 自定义服务地址。
 - **多账号**：WorkBuddy 账号与 API Key 都可以保存多个并切换。
-- **实时代理模型目录**：读取 `/v3/config`，保留每个模型的上下文窗口、输出上限、图片能力与思考档位。
+- **实时代理模型目录**：以 WorkBuddy App 通道身份读取 `/v3/config`，拿到完整目录（47 个对话模型），保留上下文窗口、输出上限、图片能力与思考档位。
+- **模型管理**：逐项勾选启用/禁用，偏好持久化，上游新增模型默认启用。
+- **积分余额**：只读读取当前账号余额与积分包数量，可手动刷新。
+- **诊断连接**：一键输出凭据、目录地址、模型数、积分与会话有效期，便于定位上游问题。
+- **上游错误分类**：排队、渠道校验、模型繁忙、积分耗尽、会话失效分别给出可执行提示。
 - **OpenAI 兼容流式聊天**：SSE 解析、工具调用增量、推理内容、usage 统计。
 - **图片输入**：通过 DSH 的 attachment seam 读取并按官方压缩档发送。
 - **无需重启**：登录、切换账号、保存 API Key 后通过 `llm/adapters-updated` 即时刷新模型选择器（Web 端）。
@@ -42,7 +46,7 @@ npm pack
 自带的 Electron 以 Node 模式执行同一个 CLI。也可以手动执行：
 
 ```sh
-dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.7.tgz
+dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.14.tgz
 ```
 
 > **不要直接 `dsh plugin add` 本目录**：本地目录会以 pnpm `link:` 方式安装，插件运行时
@@ -59,7 +63,7 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.7.tgz
 
 1. 先在 **插件** 页卸载或禁用旧包 `dsh-plugin-workbuddy-codebuddy`；
 2. 点 **添加插件**，在「包名或地址」里填 tarball 的**绝对路径**，例如：
-   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.7.tgz`
+   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.14.tgz`
 3. 安装完成后如果出现「立即启用」，点一次；没有的话重启 DSH.app；
 4. 打开 **账号菜单 → 设置 → CodeBuddy** 测试。
 
@@ -152,28 +156,54 @@ lib/clients.js           两类客户端的身份头与环境解析
 lib/workbuddy-auth.js    WorkBuddy OAuth 握手/轮询/刷新/会话集合
 lib/api-keys.js          API Key 集合与凭据服务读写
 lib/catalog.js           /v3/config 模型目录、/v2/accounts 账号
+lib/credits.js           /v2/billing/meter/get-user-resource 只读积分
+lib/model-prefs.js       模型启用/禁用偏好
+lib/errors.js            上游业务码分类与渠道指纹自愈
 lib/adapter.js           Chat Completions 序列化 + SSE → DSH chunk
 lib/web.js               设置页 HTTP 路由（仅回环同源）
-lib/client.js            设置页 React 组件（settings.section）
+lib/client.js            设置页 React 组件（settings.section + 输入框入口）
 test/                    纯函数测试
 ```
 
-## 修复记录
+## 更新记录
 
-- **0.1.7**：WorkBuddy 模型列表改为读取 `/v3/config` 的完整 `models` 目录，
-  过滤出所有支持工具调用的对话模型（26 个），不再只显示 `craft` 的 10 个推荐模型。
-## 修复记录
+### 0.1.14
+- 新增**诊断连接**：一次性输出当前凭据、目录地址、聊天地址、模型数、积分、会话有效期，便于把上游问题整段贴出来。
 
-- **0.1.6**：WorkBuddy 的 `/v3/config` 没有 `cli` agent，模型目录改按 `craft`
-  agent 解析，修复 WorkBuddy 登录后「没有返回该凭据可用的模型」。
-## 修复记录
+### 0.1.13
+- 新增上游错误分类：排队（6020/6021/6022）、渠道校验（11128）、模型繁忙（14003）、积分耗尽（14018）、会话失效、内容策略分别给出可执行提示，不再统一显示 HTTP 400。
+- 渠道指纹**自愈重试**：收到 `11128 / unapproved channel` 时，把每条 system 消息强制加上中性开头后重试一次，覆盖上游新增的未知指纹。
 
-- **0.1.5**：修复 DSH 0.2.1 的 `role: "tool"` 消息序列化。Tool 结果现在紧跟在
-  对应 assistant `tool_calls` 后发出，tool call id 超过 64 字符时使用稳定短别名，
-  纯工具调用回合的 assistant `content` 使用空字符串。解决 CodeBuddy
-  `code 11148 / tool calls and tool results do not match`。
-- **0.1.4**：配置入口移到输入框下方、与上下文进度条同一行。
-- **0.1.3**：端到端适配 DSH 0.2.1，补齐 compatibility.json，地址自动规范化。
+### 0.1.12
+- 修复 WorkBuddy `11128 / Illegal API invocation from an unapproved channel`：DSH 默认 system prompt 开头会被渠道指纹命中，现在自动加中性开头；缺少 system 消息时补一个最小占位。
+
+### 0.1.11
+- 修复 WorkBuddy `11128 / conversation id missing`：聊天请求补上官方客户端的会话身份三连（`X-Conversation-ID` / `-Request-ID` / `-Message-ID`）。
+
+### 0.1.10
+- `/v3/config` 改用 WorkBuddy App 通道 UA（`WorkBuddy/5.8.3 WorkBuddy/5.8.3 CLI/2.161.0`）。上游按 UA 通道下发不同目录，CLI 通道只有 37 个模型，App 通道有 62 个；对话模型从 26 个增加到 **47 个**，包含 `DeepSeek-V4.1-Flash`、`GLM-5.3`、`Kimi-K3`、`MiniMax-M3`、`Hy4 preview` 等。
+- 聊天通道继续使用 CLI 身份（`CLI/2.63.2`）。
+
+### 0.1.9
+- 新增**积分余额**：只读读取 `POST /v2/billing/meter/get-user-resource`，优先使用 `*Precise` 字段，显示总额与积分包数量，可手动刷新。
+
+### 0.1.8
+- 新增**模型管理**：逐项勾选启用/禁用，支持全选/全不选，偏好持久化；未勾选的模型不会出现在 DSH 模型选择器里，上游新增模型默认启用。
+
+### 0.1.7
+- WorkBuddy 模型列表改为读取 `/v3/config` 的完整 `models` 目录，过滤出所有支持工具调用的对话模型，不再只显示 `craft` 的 10 个推荐模型。
+
+### 0.1.6
+- WorkBuddy 的 `/v3/config` 没有 `cli` agent，模型目录改按 `craft` agent 解析，修复 WorkBuddy 登录后「没有返回该凭据可用的模型」。
+
+### 0.1.5
+- 修复 DSH 0.2.1 的 `role: "tool"` 消息序列化。Tool 结果现在紧跟在对应 assistant `tool_calls` 后发出，tool call id 超过 64 字符时使用稳定短别名，纯工具调用回合的 assistant `content` 使用空字符串。解决 CodeBuddy `code 11148 / tool calls and tool results do not match`。
+
+### 0.1.4
+- 配置入口移到输入框下方、与上下文进度条同一行。
+
+### 0.1.3
+- 端到端适配 DSH 0.2.1，补齐 `compatibility.json`，地址自动规范化。
 
 ## 已知限制
 
@@ -193,4 +223,5 @@ test/                    纯函数测试
 
 - [`FNOSP/fnos-dsh`](https://github.com/FNOSP/fnos-dsh/tree/main/plugins/dsh-codebuddy-plugin) 的 CodeBuddy provider 与 WorkBuddy OAuth 实现；
 - [`@dsh-sparrow/dsh-codebuddy-credits`](https://www.npmjs.com/package/@dsh-sparrow/dsh-codebuddy-credits) 的 API Key / `/v3/config` 适配经验；
-- [`@mybna134/dsh-llm-codebuddy`](https://www.npmjs.com/package/@mybna134/dsh-llm-codebuddy) 的双认证结构。
+- [`@mybna134/dsh-llm-codebuddy`](https://www.npmjs.com/package/@mybna134/dsh-llm-codebuddy) 的双认证结构；
+- [`dingminhua/dsh-connect-workbuddy`](https://github.com/dingminhua/dsh-connect-workbuddy) 的上游错误分类、渠道指纹自愈、App 通道目录 UA 与只读积分实现。

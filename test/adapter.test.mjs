@@ -155,13 +155,19 @@ test('adapter sends tool calls and tool results in OpenAI format', async (t) => 
   }
   const chat = requests.find((request) => request.url === '/v2/chat/completions')
   const body = JSON.parse(chat.body)
-  assert.equal(body.messages[1].tool_calls[0].function.name, 'lookup')
-  assert.equal(body.messages[2].role, 'tool')
-  assert.equal(body.messages[2].tool_call_id, 'call-1')
-  assert.equal(body.messages[2].content, 'result')
+  const messages = body.messages[0]?.role === 'system' ? body.messages.slice(1) : body.messages
+  assert.equal(messages[1].tool_calls[0].function.name, 'lookup')
+  assert.equal(messages[2].role, 'tool')
+  assert.equal(messages[2].tool_call_id, 'call-1')
+  assert.equal(messages[2].content, 'result')
   assert.equal(chat.headers.authorization, 'Bearer token')
-  assert.equal(chat.headers['x-ide-type'], 'WorkBuddy')
-  assert.equal(chat.headers['user-agent'], 'WorkBuddy/5.77 CodeBuddy/5.77')
+  assert.equal(chat.headers['x-ide-type'], 'CLI')
+  assert.equal(chat.headers['user-agent'], 'CLI/2.63.2 CodeBuddy/2.63.2')
+  for (const key of ['x-conversation-id', 'x-conversation-request-id', 'x-conversation-message-id']) {
+    assert.match(chat.headers[key], /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+  }
+  assert.notEqual(chat.headers['x-conversation-id'], chat.headers['x-conversation-request-id'])
+  assert.notEqual(chat.headers['x-conversation-request-id'], chat.headers['x-conversation-message-id'])
 })
 
 test('tool results immediately follow their assistant tool calls', async (t) => {
@@ -209,12 +215,13 @@ test('tool results immediately follow their assistant tool calls', async (t) => 
   }
   const chat = requests.find((request) => request.url === '/v2/chat/completions')
   const body = JSON.parse(chat.body)
-  assert.deepEqual(body.messages.map((message) => message.role), ['user', 'assistant', 'tool', 'tool', 'user', 'assistant'])
-  assert.deepEqual(body.messages[1].tool_calls.map((call) => call.id), ['c1', 'c2'])
-  assert.equal(body.messages[2].tool_call_id, 'c1')
-  assert.equal(body.messages[2].content, 'r1')
-  assert.equal(body.messages[3].tool_call_id, 'c2')
-  assert.equal(body.messages[4].content, 'after')
+  const messages = body.messages[0]?.role === 'system' ? body.messages.slice(1) : body.messages
+  assert.deepEqual(messages.map((message) => message.role), ['user', 'assistant', 'tool', 'tool', 'user', 'assistant'])
+  assert.deepEqual(messages[1].tool_calls.map((call) => call.id), ['c1', 'c2'])
+  assert.equal(messages[2].tool_call_id, 'c1')
+  assert.equal(messages[2].content, 'r1')
+  assert.equal(messages[3].tool_call_id, 'c2')
+  assert.equal(messages[4].content, 'after')
 })
 
 test('unmatched tool calls and orphan tool results are dropped', async (t) => {
@@ -260,9 +267,10 @@ test('unmatched tool calls and orphan tool results are dropped', async (t) => {
   }
   const chat = requests.find((request) => request.url === '/v2/chat/completions')
   const body = JSON.parse(chat.body)
-  assert.deepEqual(body.messages.map((message) => message.role), ['assistant', 'tool'])
-  assert.deepEqual(body.messages[0].tool_calls.map((call) => call.id), ['c1'])
-  assert.equal(body.messages[1].tool_call_id, 'c1')
+  const messages = body.messages[0]?.role === 'system' ? body.messages.slice(1) : body.messages
+  assert.deepEqual(messages.map((message) => message.role), ['assistant', 'tool'])
+  assert.deepEqual(messages[0].tool_calls.map((call) => call.id), ['c1'])
+  assert.equal(messages[1].tool_call_id, 'c1')
 })
 
 test('DSH 0.2.1 role:tool messages are serialized as tool messages', async (t) => {
@@ -304,11 +312,12 @@ test('DSH 0.2.1 role:tool messages are serialized as tool messages', async (t) =
   }
   const chat = requests.find((request) => request.url === '/v2/chat/completions')
   const body = JSON.parse(chat.body)
-  assert.deepEqual(body.messages.map((message) => message.role), ['user', 'assistant', 'tool'])
-  assert.equal(body.messages[1].content, '')
-  assert.equal(body.messages[1].tool_calls[0].id, 'c1')
-  assert.equal(body.messages[2].tool_call_id, 'c1')
-  assert.equal(body.messages[2].content, 'tool result')
+  const messages = body.messages[0]?.role === 'system' ? body.messages.slice(1) : body.messages
+  assert.deepEqual(messages.map((message) => message.role), ['user', 'assistant', 'tool'])
+  assert.equal(messages[1].content, '')
+  assert.equal(messages[1].tool_calls[0].id, 'c1')
+  assert.equal(messages[2].tool_call_id, 'c1')
+  assert.equal(messages[2].content, 'tool result')
 })
 
 test('long tool call ids are bounded consistently', async (t) => {
@@ -344,7 +353,122 @@ test('long tool call ids are bounded consistently', async (t) => {
   }
   const chat = requests.find((request) => request.url === '/v2/chat/completions')
   const body = JSON.parse(chat.body)
-  const callId = body.messages[0].tool_calls[0].id
-  assert.equal(callId, body.messages[1].tool_call_id)
+  const messages = body.messages[0]?.role === 'system' ? body.messages.slice(1) : body.messages
+  const callId = messages[0].tool_calls[0].id
+  assert.equal(callId, messages[1].tool_call_id)
   assert.ok(callId.length <= 64)
+})
+
+test('adapter prepends a neutral head to the DSH system prompt', async (t) => {
+  const { server, requests, origin } = await startServer()
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const credential = {
+    kind: 'api-key',
+    value: 'test-key',
+    entry: { environment: 'custom', endpoint: origin, account: {} },
+    origin,
+    baseURL: `${origin}/v2`,
+    account: {},
+  }
+  const adapter = new CodeBuddyAdapter({
+    options: () => ({ profile: { displayName: 'CodeBuddy' }, retryPolicy: undefined }),
+    models: () => [{ id: 'glm-4.7', name: 'GLM-4.7', contextWindow: 1000, maxTokens: 100, images: false, reasoning: false }],
+    resolveCredential: async () => credential,
+    resolveAttachments: () => undefined,
+  })
+  for await (const _chunk of adapter.stream({
+    provider: 'codebuddy',
+    model: 'glm-4.7',
+    system: 'You are an AI agent powered by DeepSeek Harness. Follow the rules.',
+    messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+  })) {
+    // consume
+  }
+  const chat = requests.find((request) => request.url === '/v2/chat/completions')
+  const body = JSON.parse(chat.body)
+  assert.equal(body.messages[0].role, 'system')
+  assert.equal(body.messages[0].content, 'You are a helpful assistant.\n\nYou are an AI agent powered by DeepSeek Harness. Follow the rules.')
+})
+
+test('adapter inserts a fallback system head when the request has none', async (t) => {
+  const { server, requests, origin } = await startServer()
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const credential = {
+    kind: 'api-key',
+    value: 'test-key',
+    entry: { environment: 'custom', endpoint: origin, account: {} },
+    origin,
+    baseURL: `${origin}/v2`,
+    account: {},
+  }
+  const adapter = new CodeBuddyAdapter({
+    options: () => ({ profile: { displayName: 'CodeBuddy' }, retryPolicy: undefined }),
+    models: () => [{ id: 'glm-4.7', name: 'GLM-4.7', contextWindow: 1000, maxTokens: 100, images: false, reasoning: false }],
+    resolveCredential: async () => credential,
+    resolveAttachments: () => undefined,
+  })
+  for await (const _chunk of adapter.stream({
+    provider: 'codebuddy',
+    model: 'glm-4.7',
+    messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+  })) {
+    // consume
+  }
+  const chat = requests.find((request) => request.url === '/v2/chat/completions')
+  const body = JSON.parse(chat.body)
+  assert.equal(body.messages[0].role, 'system')
+  assert.equal(body.messages[0].content, 'You are a helpful assistant.')
+})
+
+test('adapter retries once with a neutral head when the channel rejects', async (t) => {
+  let calls = 0
+  const seen = []
+  const server = http.createServer((req, res) => {
+    let raw = ''
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      seen.push(JSON.parse(raw))
+      calls += 1
+      if (calls === 1) {
+        res.writeHead(400, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ code: 11128, msg: 'Illegal API invocation from an unapproved channel' }))
+        return
+      }
+      res.writeHead(200, { 'content-type': 'text/event-stream' })
+      res.write('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n')
+      res.write('data: [DONE]\n\n')
+      res.end()
+    })
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const origin = `http://127.0.0.1:${server.address().port}`
+  const credential = {
+    kind: 'workbuddy',
+    value: 'token',
+    session: { auth: { domain: 'd' }, account: { uid: 'u' } },
+    origin,
+    baseURL: `${origin}/v2`,
+    account: { uid: 'u' },
+  }
+  const adapter = new CodeBuddyAdapter({
+    options: () => ({ profile: { displayName: 'CodeBuddy' }, retryPolicy: undefined }),
+    models: () => [{ id: 'glm-4.7', name: 'GLM-4.7', contextWindow: 1000, maxTokens: 100, images: false, reasoning: false }],
+    resolveCredential: async () => credential,
+    resolveAttachments: () => undefined,
+  })
+  const chunks = []
+  for await (const chunk of adapter.stream({
+    provider: 'codebuddy',
+    model: 'glm-4.7',
+    system: 'You are a future agent from SomeUnmeasuredTool.',
+    messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+  })) {
+    chunks.push(chunk)
+  }
+  assert.equal(calls, 2)
+  // 第一次按原样发出（未知指纹不会预判），第二次被强制加上中性开头。
+  assert.equal(seen[0].messages[0].content, 'You are a future agent from SomeUnmeasuredTool.')
+  assert.equal(seen[1].messages[0].content, 'You are a helpful assistant.\n\nYou are a future agent from SomeUnmeasuredTool.')
+  assert.equal(chunks.filter((chunk) => chunk.type === 'text-delta').map((chunk) => chunk.text).join(''), 'ok')
 })

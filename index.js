@@ -58,6 +58,8 @@ import {
   writeSessionStore,
 } from './lib/workbuddy-auth.js'
 import { installWeb } from './lib/web.js'
+import { fetchCredits } from './lib/credits.js'
+import { filterEnabledModels, publicModelPrefs, readModelPrefs, writeModelPrefs } from './lib/model-prefs.js'
 
 /** Cordis 插件名。 */
 export const name = 'workbuddy-lite'
@@ -143,6 +145,7 @@ export function apply(ctx, config = {}) {
   }
 
   /** 当前进程内的模型事实（不落设置节）。 */
+  let allModels = []
   let models = []
   let modelSource
   let modelUpdatedAt = 0
@@ -151,6 +154,10 @@ export function apply(ctx, config = {}) {
   let generation = 0
   /** WorkBuddy 刷新按会话 id 单飞。 */
   const refreshes = new Map()
+  /** 积分余额只读缓存；失败不阻塞模型目录。 */
+  let credits
+  let creditsError
+  let creditsUpdatedAt = 0
 
   /**
    * 读取当前 WorkBuddy 凭据，必要时刷新。
@@ -263,6 +270,36 @@ export function apply(ctx, config = {}) {
     return list
   }
 
+  /** 把原始目录按用户偏好裁剪；全部被禁用时保留空列表并给出可操作错误。 */
+  const applyModelPrefs = (list, prefs) => {
+    const enabled = filterEnabledModels(list, prefs)
+    return {
+      enabled,
+      error: list.length > 0 && enabled.length === 0
+        ? '所有模型都被禁用；请在设置 → CodeBuddy → 模型管理里至少启用一个'
+        : undefined,
+    }
+  }
+
+  /** 查询并缓存积分余额；失败只记录，不影响模型与聊天。 */
+  const refreshCreditsFor = async (credential) => {
+    if (credential?.kind !== 'workbuddy') {
+      credits = undefined
+      creditsError = undefined
+      creditsUpdatedAt = 0
+      return
+    }
+    try {
+      const next = await fetchCredits(credential)
+      credits = { total: next.total, packages: next.packages }
+      creditsUpdatedAt = next.updatedAt
+      creditsError = undefined
+    }
+    catch (error) {
+      creditsError = error instanceof Error ? error.message : String(error)
+    }
+  }
+
   /**
    * 用给定凭据刷新缓存并通知模型选择器。
    * @param {any} credential
@@ -273,12 +310,15 @@ export function apply(ctx, config = {}) {
     const issued = ++generation
     const list = await loadModels(credential, signal)
     if (issued !== generation) return models
-    models = list
+    const prefs = await readModelPrefs(ctx)
+    const applied = applyModelPrefs(list, prefs)
+    allModels = list
+    models = applied.enabled
     modelSource = credential.kind
     modelUpdatedAt = Date.now()
-    lastError = undefined
+    lastError = applied.error
     registration?.replace([PROVIDER])
-    return list
+    return models
   }
 
   /**
@@ -325,6 +365,7 @@ export function apply(ctx, config = {}) {
       const account = await fetchAccount(credential)
       await rememberAccount(credential, account)
       await refreshModelsWith(credential)
+      await refreshCreditsFor(credential)
     }
     catch (error) {
       lastError = error instanceof Error ? error.message : String(error)
@@ -389,11 +430,15 @@ export function apply(ctx, config = {}) {
       const list = await loadModels(credential, signal ?? request?.signal)
       const issued = ++generation
       if (issued === generation) {
-        models = list
+        const prefs = await readModelPrefs(ctx)
+        const applied = applyModelPrefs(list, prefs)
+        allModels = list
+        models = applied.enabled
         modelSource = credential.kind
         modelUpdatedAt = Date.now()
+        lastError = applied.error
       }
-      return list.map((model) => ({
+      return models.map((model) => ({
         id: model.id,
         name: model.name,
         contextWindow: model.contextWindow,
@@ -415,6 +460,7 @@ export function apply(ctx, config = {}) {
     const profile = options().profile
     const sessions = await readSessionStore(ctx)
     const keyStore = await readApiKeyStore(ctx)
+    const prefs = await readModelPrefs(ctx)
     const keys = await publicApiKeys(ctx, keyStore)
     // 环境变量里的 Key 不落库，但要在设置页可见（只显示掩码）。
     const ambient = await readAmbientApiKeyAsync(ctx)
@@ -451,6 +497,7 @@ export function apply(ctx, config = {}) {
         id: PROVIDER,
         active: models.length > 0,
         modelCount: models.length,
+        totalModelCount: allModels.length,
         modelSource: modelSource ?? null,
         modelUpdatedAt: modelUpdatedAt || null,
         error: lastError ?? null,
@@ -459,6 +506,22 @@ export function apply(ctx, config = {}) {
           catalogUrl: `${endpointOrigin}${CONFIG_PATH}`,
           chatUrl: `${endpointOrigin}/v2${CHAT_PATH}`,
         }),
+      },
+      models: allModels.map((model) => ({
+        id: model.id,
+        name: model.name,
+        contextWindow: model.contextWindow,
+        maxTokens: model.maxTokens,
+        images: model.images === true,
+        ...(Array.isArray(model.thinkingLevels) ? { thinkingLevels: [...model.thinkingLevels] } : {}),
+      })),
+      modelPrefs: publicModelPrefs(prefs),
+      credits: {
+        configured: profile.mode === 'workbuddy' && credits !== undefined,
+        total: credits?.total ?? null,
+        packages: credits?.packages ?? 0,
+        updatedAt: creditsUpdatedAt || null,
+        error: creditsError ?? null,
       },
       workbuddy: {
         authenticated: active !== undefined,
@@ -479,12 +542,17 @@ export function apply(ctx, config = {}) {
    * @returns {Promise<void>}
    */
   const refreshAfterChange = async () => {
+    credits = undefined
+    creditsError = undefined
+    creditsUpdatedAt = 0
     try {
       const credential = await resolveCredential(PROVIDER, options().profile)
       await refreshModelsWith(credential)
+      void refreshCreditsFor(credential)
     }
     catch (error) {
       lastError = error instanceof Error ? error.message : String(error)
+      allModels = []
       models = []
       modelSource = undefined
       modelUpdatedAt = 0
@@ -594,10 +662,16 @@ export function apply(ctx, config = {}) {
         ...(account === undefined ? {} : { account }),
       })
       await setMode('apikey')
-      models = list
+      credits = undefined
+      creditsError = undefined
+      creditsUpdatedAt = 0
+      const prefs = await readModelPrefs(ctx)
+      const applied = applyModelPrefs(list, prefs)
+      allModels = list
+      models = applied.enabled
       modelSource = 'api-key'
       modelUpdatedAt = Date.now()
-      lastError = undefined
+      lastError = applied.error
       registration?.replace([PROVIDER])
       return status()
     },
@@ -623,6 +697,58 @@ export function apply(ctx, config = {}) {
     },
     async refreshModels() {
       await refreshAfterChange()
+      return status()
+    },
+    async diagnose() {
+      const profile = options().profile
+      const result = { mode: profile.mode, catalogUrl: null, chatUrl: null, models: 0, credits: null, error: null, session: null, entries: [] }
+      try {
+        const credential = await resolveCredential(PROVIDER, profile)
+        result.catalogUrl = `${credential.origin}${CONFIG_PATH}`
+        result.chatUrl = `${credential.baseURL}${CHAT_PATH}`
+        if (credential.kind === 'workbuddy') {
+          const auth = credential.session?.auth ?? {}
+          result.session = {
+            domain: auth.domain ?? null,
+            expiresAt: auth.expiresAt ?? null,
+            refreshExpiresAt: auth.refreshExpiresAt ?? null,
+            uid: credential.account?.uid ?? null,
+            enterpriseId: credential.account?.enterpriseId ?? null,
+          }
+        }
+        else {
+          result.session = { environment: credential.entry?.environment ?? null, endpoint: credential.origin, uid: credential.account?.uid ?? null }
+        }
+        const list = await loadModels(credential)
+        result.models = list.length
+        if (credential.kind === 'workbuddy') {
+          const creditsResult = await fetchCredits(credential).catch(() => undefined)
+          if (creditsResult !== undefined) result.credits = { total: creditsResult.total, packages: creditsResult.packages }
+        }
+        result.entries = list.slice(0, 5).map((model) => model.id)
+      }
+      catch (error) {
+        result.error = error instanceof Error ? error.message : String(error)
+      }
+      return { ok: true, ...result }
+    },
+    async refreshCredits() {
+      const credential = await resolveCredential(PROVIDER, options().profile)
+      await refreshCreditsFor(credential)
+      return status()
+    },
+    async setModelPrefs(disabled) {
+      const prefs = await writeModelPrefs(ctx, { disabled })
+      if (allModels.length === 0) {
+        await refreshAfterChange().catch(() => {})
+      }
+      else {
+        const applied = applyModelPrefs(allModels, prefs)
+        models = applied.enabled
+        modelUpdatedAt = Date.now()
+        lastError = applied.error
+        registration?.replace([PROVIDER])
+      }
       return status()
     },
   }

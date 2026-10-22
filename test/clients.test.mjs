@@ -5,6 +5,7 @@ import {
   normalizeOrigin,
   resolveApiOrigin,
   apiKeyIdentityHeaders,
+  workbuddyCatalogHeaders,
   workbuddyIdentityHeaders,
 } from '../lib/clients.js'
 
@@ -51,14 +52,36 @@ test('api key identity uses CLI product headers', () => {
   assert.equal(headers['X-Enterprise-Id'], 'e1')
 })
 
-test('workbuddy identity uses WorkBuddy product headers and domain', () => {
+test('workbuddy chat identity uses CLI product headers and domain', () => {
   const headers = workbuddyIdentityHeaders({
+    auth: { domain: 'd1' },
+    account: { uid: 'u1', enterpriseId: 'e1', departmentFullName: 'dept' },
+  })
+  assert.equal(headers['X-IDE-Type'], 'CLI')
+  assert.equal(headers['X-IDE-Name'], 'CLI')
+  assert.match(headers['user-agent'], /^CLI\/2\.63\.2/)
+  assert.equal(headers['X-Domain'], 'd1')
+  assert.equal(headers['X-Department-Info'], 'dept')
+})
+
+test('workbuddy catalog identity uses the App channel UA', () => {
+  const headers = workbuddyCatalogHeaders({
     auth: { domain: 'd1' },
     account: { uid: 'u1', enterpriseId: 'e1', departmentFullName: 'dept' },
   })
   assert.equal(headers['X-IDE-Type'], 'WorkBuddy')
   assert.equal(headers['X-IDE-Name'], 'WorkBuddy')
-  assert.match(headers['user-agent'], /^WorkBuddy\//)
+  assert.equal(headers['user-agent'], 'WorkBuddy/5.8.3 WorkBuddy/5.8.3 CLI/2.161.0')
   assert.equal(headers['X-Domain'], 'd1')
   assert.equal(headers['X-Department-Info'], 'dept')
+})
+
+test('iOA api key uses the iOA domain and enterprise header', () => {
+  const headers = apiKeyIdentityHeaders({
+    environment: 'ioa',
+    account: { uid: 'u1', enterpriseId: 'ent-1' },
+  })
+  assert.equal(headers['X-Domain'], 'tencent.sso.copilot.tencent.com')
+  assert.equal(headers['X-Enterprise-Id'], 'ent-1')
+  assert.equal(headers['X-User-Id'], 'u1')
 })

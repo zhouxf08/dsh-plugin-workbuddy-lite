@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-workbuddy-lite",
-  "version": "0.1.7",
+  "version": "0.1.14",
   "description": "WorkBuddy Lite —— WorkBuddy 浏览器登录 + CodeBuddy CLI API Key 双认证的 DeepSeek Harness 模型接入插件",
   "type": "module",
   "main": "index.js",
@@ -45,6 +45,8 @@
     "@deepseek-ai/cordis": "^4.0.5",
     "@deepseek-ai/dsh-attachment": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-locale": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-layout": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.2",
     "@deepseek-ai/dsh-credentials": "0.2.1-rc.2",

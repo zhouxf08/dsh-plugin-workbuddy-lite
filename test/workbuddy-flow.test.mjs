@@ -37,7 +37,7 @@ test('startWorkBuddyLogin performs the platform handshake and adds version', asy
   })
   const result = await startWorkBuddyLogin()
   assert.equal(result.state, 'state-1')
-  assert.match(result.authUrl, /version=5\.77/)
+  assert.match(result.authUrl, /version=5\.8\.3/)
   assert.match(seen.url, /\/v2\/plugin\/auth\/state/)
   assert.match(seen.url, /platform=WorkBuddy/)
   assert.equal(seen.init.method, 'POST')
