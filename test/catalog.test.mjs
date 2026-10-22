@@ -66,3 +66,30 @@ test('parseModels drops entries without output capacity', () => {
   })
   assert.deepEqual(models, [])
 })
+
+test('parseModels uses the WorkBuddy craft agent when cli is absent', () => {
+  const models = parseModels({
+    agents: [
+      { name: 'craft', models: ['deepseek-v4-flash', 'glm-5.1'] },
+      { name: 'chat', models: ['hunyuan-chat'] },
+    ],
+    models: [
+      { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', maxInputTokens: 1000000, maxOutputTokens: 50000, supportsImages: true },
+      { id: 'glm-5.1', name: 'GLM-5.1', maxInputTokens: 200000, maxOutputTokens: 48000, supportsImages: true },
+      { id: 'hunyuan-chat', name: 'Hunyuan Chat', maxInputTokens: 128000, maxOutputTokens: 16000 },
+    ],
+  }, 'craft')
+  assert.deepEqual(models.map((model) => model.id), ['deepseek-v4-flash', 'glm-5.1'])
+  assert.equal(models[0].contextWindow, 1000000)
+})
+
+test('parseModels falls back to the first agent with models', () => {
+  const models = parseModels({
+    agents: [
+      { name: 'unknown', models: [] },
+      { name: 'craft', models: ['a'] },
+    ],
+    models: [{ id: 'a', name: 'A', maxInputTokens: 1000, maxOutputTokens: 100 }],
+  }, 'cli')
+  assert.deepEqual(models.map((model) => model.id), ['a'])
+})

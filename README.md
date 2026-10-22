@@ -42,7 +42,7 @@ npm pack
 自带的 Electron 以 Node 模式执行同一个 CLI。也可以手动执行：
 
 ```sh
-dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.5.tgz
+dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.6.tgz
 ```
 
 > **不要直接 `dsh plugin add` 本目录**：本地目录会以 pnpm `link:` 方式安装，插件运行时
@@ -59,7 +59,7 @@ dsh plugin --profile web add ./dsh-plugin-workbuddy-lite-0.1.5.tgz
 
 1. 先在 **插件** 页卸载或禁用旧包 `dsh-plugin-workbuddy-codebuddy`；
 2. 点 **添加插件**，在「包名或地址」里填 tarball 的**绝对路径**，例如：
-   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.5.tgz`
+   `/Users/you/dsh-plugin-workbuddy-lite/dsh-plugin-workbuddy-lite-0.1.6.tgz`
 3. 安装完成后如果出现「立即启用」，点一次；没有的话重启 DSH.app；
 4. 打开 **账号菜单 → 设置 → CodeBuddy** 测试。
 
@@ -158,6 +158,10 @@ lib/client.js            设置页 React 组件（settings.section）
 test/                    纯函数测试
 ```
 
+## 修复记录
+
+- **0.1.6**：WorkBuddy 的 `/v3/config` 没有 `cli` agent，模型目录改按 `craft`
+  agent 解析，修复 WorkBuddy 登录后「没有返回该凭据可用的模型」。
 ## 修复记录
 
 - **0.1.5**：修复 DSH 0.2.1 的 `role: "tool"` 消息序列化。Tool 结果现在紧跟在
