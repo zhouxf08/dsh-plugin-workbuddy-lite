@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parseModels } from '../lib/catalog.js'
+import { parseModels, parseWorkBuddyModels } from '../lib/catalog.js'
 
 const config = {
   agents: [
@@ -91,5 +91,32 @@ test('parseModels falls back to the first agent with models', () => {
     ],
     models: [{ id: 'a', name: 'A', maxInputTokens: 1000, maxOutputTokens: 100 }],
   }, 'cli')
+  assert.deepEqual(models.map((model) => model.id), ['a'])
+})
+
+
+test('parseWorkBuddyModels exposes all chat-capable models, not just craft', () => {
+  const models = parseWorkBuddyModels({
+    agents: [{ name: 'craft', models: ['a'] }],
+    models: [
+      { id: 'a', name: 'A', maxInputTokens: 1000, maxOutputTokens: 100, supportsToolCall: true },
+      { id: 'b', name: 'B', maxInputTokens: 2000, maxOutputTokens: 200, supportsToolCall: true },
+      { id: 'completion-gf', name: 'Completion', maxInputTokens: 2000, maxOutputTokens: 200, supportsToolCall: true },
+      { id: 'codewise-rewrite', name: 'Codewise', maxInputTokens: 2000, maxOutputTokens: 200 },
+      { id: 'hunyuan-image-v3.0-art', name: 'Image', maxInputTokens: 0, maxOutputTokens: 0, tags: ['text-to-image'] },
+      { id: 'no-tools', name: 'No tools', maxInputTokens: 2000, maxOutputTokens: 200 },
+    ],
+  })
+  assert.deepEqual(models.map((model) => model.id), ['a', 'b'])
+})
+
+test('parseWorkBuddyModels falls back to craft when the full list is unusable', () => {
+  const models = parseWorkBuddyModels({
+    agents: [{ name: 'craft', models: ['a'] }],
+    models: [
+      { id: 'a', name: 'A', maxInputTokens: 1000, maxOutputTokens: 100, supportsToolCall: true },
+      { id: 'completion-gf', name: 'Completion', maxInputTokens: 2000, maxOutputTokens: 200, supportsToolCall: true },
+    ],
+  })
   assert.deepEqual(models.map((model) => model.id), ['a'])
 })
